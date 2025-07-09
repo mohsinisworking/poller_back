@@ -14,7 +14,7 @@ def create_poll(req: func.HttpRequest) -> func.HttpResponse:
         data = req.get_json()
         poll_id = data.get("poll_id")
         question = data.get("question")
-        options = data.get("options")  # List of options
+        options = data.get("options")
 
         if not poll_id or not question or not options or not isinstance(options, list):
             return func.HttpResponse("Invalid input", status_code=400)
@@ -59,6 +59,7 @@ def get_poll(req: func.HttpRequest) -> func.HttpResponse:
     poll_id = req.params.get("poll_id")
     if not poll_id or poll_id not in polls:
         return func.HttpResponse("Poll not found", status_code=404)
+
     return func.HttpResponse(json.dumps(polls[poll_id]), mimetype="application/json")
 
 @app.function_name(name="getAllPolls")
@@ -69,36 +70,3 @@ def get_all_polls(req: func.HttpRequest) -> func.HttpResponse:
         for poll_id, poll in polls.items()
     ]
     return func.HttpResponse(json.dumps(poll_list), mimetype="application/json")
-
-@app.function_name(name="broadcastPoll")
-@app.route(route="broadcastPoll", auth_level=func.AuthLevel.ANONYMOUS)
-@app.output_binding(
-    type="signalR",
-    name="signalRMessages",
-    hub_name="pollrealtime",  # your SignalR hub name
-    connection="AzureSignalRConnectionString"
-)
-def broadcast_poll(req: func.HttpRequest, signalRMessages: func.Out[func.Json]) -> func.HttpResponse:
-    try:
-        data = req.get_json()
-        poll_id = data.get("poll_id")
-        question = data.get("question")
-        options = data.get("options")
-
-        if not poll_id or not question or not options:
-            return func.HttpResponse("Missing fields", status_code=400)
-
-        signalRMessages.set([
-            {
-                "target": "newPoll",  # name of the function to call in JS client
-                "arguments": [{
-                    "poll_id": poll_id,
-                    "question": question,
-                    "options": options
-                }]
-            }
-        ])
-        return func.HttpResponse("Broadcast sent", status_code=200)
-    except Exception as e:
-        logging.error(str(e))
-        return func.HttpResponse("Error broadcasting", status_code=500)
