@@ -28,7 +28,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ✅ Optional: run tests here
+      #  Optional: run tests here
 
       - name: Deploy to Azure Function App via publish profile
         uses: Azure/functions-action@v1
