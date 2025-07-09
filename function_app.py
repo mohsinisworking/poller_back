@@ -7,6 +7,7 @@ app = func.FunctionApp()
 # In-memory poll storage (resets when app restarts)
 polls = {}
 
+@app.function_name(name="createPoll")
 @app.route(route="createPoll", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def create_poll(req: func.HttpRequest) -> func.HttpResponse:
     try:
@@ -32,6 +33,7 @@ def create_poll(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(str(e))
         return func.HttpResponse("Error creating poll", status_code=500)
 
+@app.function_name(name="votePoll")
 @app.route(route="votePoll", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def vote_poll(req: func.HttpRequest) -> func.HttpResponse:
     try:
@@ -51,6 +53,7 @@ def vote_poll(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(str(e))
         return func.HttpResponse("Error voting in poll", status_code=500)
 
+@app.function_name(name="getPoll")
 @app.route(route="getPoll", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_poll(req: func.HttpRequest) -> func.HttpResponse:
     poll_id = req.params.get("poll_id")
@@ -58,6 +61,7 @@ def get_poll(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse("Poll not found", status_code=404)
     return func.HttpResponse(json.dumps(polls[poll_id]), mimetype="application/json")
 
+@app.function_name(name="getAllPolls")
 @app.route(route="getAllPolls", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_all_polls(req: func.HttpRequest) -> func.HttpResponse:
     poll_list = [
@@ -66,7 +70,6 @@ def get_all_polls(req: func.HttpRequest) -> func.HttpResponse:
     ]
     return func.HttpResponse(json.dumps(poll_list), mimetype="application/json")
 
-# NEW SignalR Broadcast Endpoint
 @app.function_name(name="broadcastPoll")
 @app.route(route="broadcastPoll", auth_level=func.AuthLevel.ANONYMOUS)
 @app.output_binding(
