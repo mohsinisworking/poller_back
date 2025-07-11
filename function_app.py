@@ -19,8 +19,8 @@ sample_data = [
         "options": ["Spring", "Summer", "Autumn", "Winter"]
     },
     {
-        "question": "Should Pakistan adopt Secularism?",
-        "options": ["YES!", "NO!"]
+        "question": "Thoughts on Remote Work?",
+        "options": ["Should be fully implemented!", "Hybrid", "Should be BANNED"]
     }
 ]
 for sample in sample_data:
