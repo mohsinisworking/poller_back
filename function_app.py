@@ -11,16 +11,16 @@ polls = {}
 # --- Add sample polls on startup (for local dev/demo) ---
 sample_data = [
     {
-        "question": "Best Economic Plan?",
-        "options": ["Capitalism", "Communism", "Socialism"]
+        "question": "Thoughts on Remote Work?",
+        "options": ["Should be fully implemented!", "Hybrid", "Should be BANNED"]
     },
     {
         "question": "Best Season?",
         "options": ["Spring", "Summer", "Autumn", "Winter"]
     },
     {
-        "question": "Thoughts on Remote Work?",
-        "options": ["Should be fully implemented!", "Hybrid", "Should be BANNED"]
+        "question": "Best Economic Plan?",
+        "options": ["Capitalism", "Communism", "Socialism"]
     }
 ]
 for sample in sample_data:
@@ -33,9 +33,24 @@ for sample in sample_data:
     }
     time.sleep(0.01)  # ensure unique poll_id
 
+# --- SignalR negotiate endpoint ---
+@app.function_name(name="negotiate")
+@app.route(route="negotiate", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.signalr_connection_info(arg_name="connection_info", hub_name="pollz")
+def negotiate(req: func.HttpRequest, connection_info) -> func.HttpResponse:
+    return func.HttpResponse(
+        body=json.dumps({
+            "url": connection_info["url"],
+            "accessToken": connection_info["accessToken"]
+        }),
+        mimetype="application/json"
+    )
+
+# --- Create Poll (broadcasts update) ---
 @app.function_name(name="createPoll")
 @app.route(route="createPoll", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def create_poll(req: func.HttpRequest) -> func.HttpResponse:
+@app.signalr_output(arg_name="signalRMessages", hub_name="pollz")
+def create_poll(req: func.HttpRequest, signalRMessages: func.Out[func.SignalRMessage]) -> func.HttpResponse:
     try:
         data = req.get_json()
         question = data.get("question")
@@ -54,14 +69,23 @@ def create_poll(req: func.HttpRequest) -> func.HttpResponse:
         }
         polls[poll_id] = poll
 
+        # Broadcast all polls to all clients
+        poll_list = list(polls.values())
+        signalRMessages.set(func.SignalRMessage(
+            target="pollsUpdated",
+            arguments=[poll_list]
+        ))
+
         return func.HttpResponse(json.dumps(poll), mimetype="application/json", status_code=201)
     except Exception as e:
         logging.error(str(e))
         return func.HttpResponse("Error creating poll", status_code=500)
 
+# --- Vote Poll (broadcasts update) ---
 @app.function_name(name="votePoll")
 @app.route(route="votePoll", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def vote_poll(req: func.HttpRequest) -> func.HttpResponse:
+@app.signalr_output(arg_name="signalRMessages", hub_name="pollz")
+def vote_poll(req: func.HttpRequest, signalRMessages: func.Out[func.SignalRMessage]) -> func.HttpResponse:
     try:
         data = req.get_json()
         poll_id = data.get("poll_id")
@@ -74,11 +98,20 @@ def vote_poll(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse("Invalid option index", status_code=400)
 
         polls[poll_id]["votes"][option_index] += 1
+
+        # Broadcast all polls to all clients
+        poll_list = list(polls.values())
+        signalRMessages.set(func.SignalRMessage(
+            target="pollsUpdated",
+            arguments=[poll_list]
+        ))
+
         return func.HttpResponse(json.dumps(polls[poll_id]), mimetype="application/json", status_code=200)
     except Exception as e:
         logging.error(str(e))
         return func.HttpResponse("Error voting in poll", status_code=500)
 
+# --- Get Single Poll ---
 @app.function_name(name="getPoll")
 @app.route(route="getPoll", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_poll(req: func.HttpRequest) -> func.HttpResponse:
@@ -89,6 +122,7 @@ def get_poll(req: func.HttpRequest) -> func.HttpResponse:
     poll = polls[poll_id]
     return func.HttpResponse(json.dumps(poll), mimetype="application/json")
 
+# --- Get All Polls ---
 @app.function_name(name="getAllPolls")
 @app.route(route="getAllPolls", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_all_polls(req: func.HttpRequest) -> func.HttpResponse:
